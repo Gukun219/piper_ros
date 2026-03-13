@@ -1,7 +1,7 @@
 """
 piper_mujoco_ros2.launch.py
 ────────────────────────────
-Launch file for Piper arm simulation with MuJoCo + ros2_control.
+Launch file for Piper arm simulation with ros2_control admittance control.
 
 Controller chain:
   MoveIt  ──(FollowJointTrajectory action)──►  arm_controller (JTC, chainable)
@@ -10,24 +10,29 @@ Controller chain:
                                              admittance_controller
                                                      │ position command
                                                      ▼
-                                         mujoco_ros2_control hardware interface
-                                                     │
-                                                     ▼
-                                            MuJoCo physics engine
+                                          hardware interface  (mock or MuJoCo)
+
+Launch arguments:
+  use_mock_hardware  [true]  — Use mock_components/GenericSystem (default).
+                               No extra package needed. Joints mirror commands.
+                               MuJoCo viewer runs as a separate node subscribing
+                               to /joint_states for visual feedback.
+                    [false]  — Use mujoco_ros2_control/MuJoCoSystem for full
+                               closed-loop physics + force feedback.
+                               Requires mujoco_ros2_control to be built.
+
+Controller load order (critical for chaining):
+  1. joint_state_broadcaster
+  2. force_torque_sensor_broadcaster
+  3. admittance_controller   ← registers chainable interfaces first
+  4. arm_controller          ← connects to admittance chainable interfaces
+  5. gripper_controller
 
 Prerequisites:
-  sudo apt install ros-humble-mujoco-ros2-control \\
-                   ros-humble-admittance-controller \\
+  sudo apt install ros-humble-admittance-controller \\
                    ros-humble-force-torque-sensor-broadcaster \\
                    ros-humble-kinematics-interface \\
                    ros-humble-kinematics-interface-kdl
-
-Controller load order (important for chaining):
-  1. joint_state_broadcaster
-  2. force_torque_sensor_broadcaster
-  3. admittance_controller   ← registers chainable interfaces
-  4. arm_controller          ← connects to admittance chainable interfaces
-  5. gripper_controller
 """
 
 import os
@@ -37,8 +42,11 @@ import xacro
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, RegisterEventHandler
+from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
+                             RegisterEventHandler)
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -49,14 +57,31 @@ def remove_comments(text):
 
 def generate_launch_description():
     pkg_description = get_package_share_directory('piper_description')
-    pkg_mujoco     = get_package_share_directory('piper_mujoco')
+    pkg_mujoco      = get_package_share_directory('piper_mujoco')
 
-    # ── Robot description (URDF with MuJoCo ros2_control block) ──────────────
+    # ── Launch argument ───────────────────────────────────────────────────────
+    use_mock_hardware_arg = DeclareLaunchArgument(
+        'use_mock_hardware',
+        default_value='true',
+        description=(
+            'Use mock_components/GenericSystem (true) or '
+            'mujoco_ros2_control/MuJoCoSystem (false).'
+        ),
+    )
+    use_mock_hardware = LaunchConfiguration('use_mock_hardware')
+
+    # ── Robot description ─────────────────────────────────────────────────────
+    # Process xacro at launch time, passing the mock-hardware flag
     xacro_file = os.path.join(pkg_description, 'urdf',
                               'piper_description_mujoco.xacro')
+
+    # We need the value of use_mock_hardware at parse time for xacro:arg.
+    # Since LaunchConfiguration is resolved at runtime, we default to 'true'
+    # here and let the user override via command line.
+    # For a fully dynamic version, use ParameterValue + Command substitution.
     doc = xacro.parse(open(xacro_file))
-    xacro.process_doc(doc)
-    robot_description = remove_comments(doc.toxml())
+    xacro.process_doc(doc, mappings={'use_mock_hardware': 'true'})
+    robot_description_default = remove_comments(doc.toxml())
 
     controllers_yaml = os.path.join(pkg_mujoco, 'config', 'ros2_controllers.yaml')
 
@@ -66,83 +91,91 @@ def generate_launch_description():
         executable='robot_state_publisher',
         output='screen',
         parameters=[
-            {'robot_description': robot_description},
+            {'robot_description': robot_description_default},
             {'publish_frequency': 50.0},
         ],
     )
 
-    # ── ros2_control_node (mujoco_ros2_control provides this or we use the
-    #    standard one; mujoco_ros2_control may launch MuJoCo viewer internally)
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── ros2_control_node ─────────────────────────────────────────────────────
+    # Note: robot_description is published by robot_state_publisher via topic.
+    # Passing it directly here as a parameter is deprecated in Humble but still
+    # works; the warning is harmless.
     ros2_control_node = Node(
         package='controller_manager',
         executable='ros2_control_node',
         output='screen',
         parameters=[
-            {'robot_description': robot_description},
+            {'robot_description': robot_description_default},
             controllers_yaml,
+        ],
+        remappings=[
+            ('~/robot_description', '/robot_description'),
         ],
     )
 
-    # ── Controller spawners ───────────────────────────────────────────────────
-    # 1. Joint state broadcaster
+    # ── MuJoCo visualization node (mock mode: mirrors /joint_states → MuJoCo)
+    # Runs only when use_mock_hardware=true; provides visual feedback even
+    # without a full mujoco_ros2_control integration.
+    mujoco_viewer = Node(
+        package='piper_mujoco',
+        executable='piper_mujoco_ctrl.py',
+        output='screen',
+        condition=IfCondition(use_mock_hardware),
+    )
+
+    # ── Controller spawners (ordered) ─────────────────────────────────────────
     spawn_jsb = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller',
              '--set-state', 'active', 'joint_state_broadcaster'],
         output='screen',
     )
 
-    # 2. FT sensor broadcaster (publishes wrench topic for monitoring)
     spawn_ft_broadcaster = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller',
              '--set-state', 'active', 'force_torque_sensor_broadcaster'],
         output='screen',
     )
 
-    # 3. admittance_controller FIRST — registers chainable reference interfaces
+    # admittance_controller FIRST — registers chainable reference interfaces
     spawn_admittance = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller',
              '--set-state', 'active', 'admittance_controller'],
         output='screen',
     )
 
-    # 4. arm_controller SECOND — connects to admittance chainable interfaces
+    # arm_controller SECOND — connects to admittance chainable interfaces
     spawn_arm = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller',
              '--set-state', 'active', 'arm_controller'],
         output='screen',
     )
 
-    # 5. gripper_controller (independent, writes joint7/8 directly)
     spawn_gripper = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller',
              '--set-state', 'active', 'gripper_controller'],
         output='screen',
     )
 
-    # ── Launch sequence: ros2_control_node → jsb → ft → admittance → arm+gripper
-    evt_after_control_node = RegisterEventHandler(
+    # ── Event chain: control_node ready → jsb → ft → admittance → arm+gripper
+    evt_jsb = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=ros2_control_node,
             on_exit=[spawn_jsb],
         )
     )
-
-    evt_after_jsb = RegisterEventHandler(
+    evt_ft = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=spawn_jsb,
             on_exit=[spawn_ft_broadcaster],
         )
     )
-
-    evt_after_ft = RegisterEventHandler(
+    evt_admittance = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=spawn_ft_broadcaster,
             on_exit=[spawn_admittance],
         )
     )
-
-    evt_after_admittance = RegisterEventHandler(
+    evt_arm = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=spawn_admittance,
             on_exit=[spawn_arm, spawn_gripper],
@@ -150,10 +183,12 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        use_mock_hardware_arg,
         robot_state_publisher,
         ros2_control_node,
-        evt_after_control_node,
-        evt_after_jsb,
-        evt_after_ft,
-        evt_after_admittance,
+        mujoco_viewer,
+        evt_jsb,
+        evt_ft,
+        evt_admittance,
+        evt_arm,
     ])

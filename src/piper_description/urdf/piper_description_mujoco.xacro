@@ -3,14 +3,27 @@
   MuJoCo-specific robot description for Piper arm.
   Includes the base URDF and adds:
     - FT sensor link/joint at the end-effector (link6)
-    - ros2_control block using mujoco_ros2_control/MuJoCoSystem hardware plugin
+    - ros2_control block for the JTC + AdmittanceController control chain
 
   Control pipeline:
     MoveIt  →  JointTrajectoryController (chainable)
             →  AdmittanceController      (reads FT sensor, outputs position)
-            →  mujoco_ros2_control/MuJoCoSystem  (MuJoCo physics)
+            →  hardware interface  (MuJoCo physics or mock)
+
+  Hardware plugin selection (set via xacro arg 'use_mock_hardware'):
+    true  (default) → mock_components/GenericSystem
+      • No external package required; joints mirror commands immediately.
+      • Use alongside piper_mujoco_ctrl.py for MuJoCo visualization.
+      • FT sensor states are held at zero → admittance_controller
+        tracks reference exactly (useful for validating the chain).
+    false           → mujoco_ros2_control/MuJoCoSystem
+      • Full closed-loop MuJoCo physics + force feedback.
+      • Requires: ros-humble-mujoco-ros2-control (build from source if
+        not available: github.com/ros-controls/mujoco_ros2_control).
 -->
 <robot name="piper" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:arg name="use_mock_hardware" default="true"/>
 
   <!-- Include base robot description (links, joints, transmissions) -->
   <xacro:include filename="$(find piper_description)/urdf/piper_description.xacro"/>
@@ -36,8 +49,7 @@
   </joint>
 
   <!-- ─────────────────────────────────────────────────────────────────
-       ros2_control hardware interface for MuJoCo simulation.
-       Requires: ros-humble-mujoco-ros2-control (or equivalent).
+       ros2_control hardware interface.
 
        Joint command interfaces  : position only  (unchanged from real hw)
        Joint state interfaces    : position, velocity
@@ -45,7 +57,14 @@
        ───────────────────────────────────────────────────────────────── -->
   <ros2_control name="piper_mujoco_system" type="system">
     <hardware>
-      <plugin>mujoco_ros2_control/MuJoCoSystem</plugin>
+      <xacro:if value="$(arg use_mock_hardware)">
+        <!-- mock: no external package needed, joints mirror commands -->
+        <plugin>mock_components/GenericSystem</plugin>
+      </xacro:if>
+      <xacro:unless value="$(arg use_mock_hardware)">
+        <!-- full MuJoCo physics: requires mujoco_ros2_control -->
+        <plugin>mujoco_ros2_control/MuJoCoSystem</plugin>
+      </xacro:unless>
     </hardware>
 
     <!-- Arm joints: position command, position+velocity state -->
