@@ -38,6 +38,7 @@
                             <body name="link6" pos="8.8259e-05 -0.091 0" quat="0.707105 0.707108 0 0">
                                 <inertial pos="-0.000179422 7.72241e-05 0.0305765" quat="0.498967 0.497649 -0.502223 0.501147" mass="0.152309" diaginertia="0.000119759 0.000110059 4.99704e-05" />
                                 <joint name="joint6" pos="0 0 0" axis="0 0 1" limited="true" range="-2.0944 2.0944" damping="0.1"/>
+                                <site name="ft_sensor_site" pos="0 0 0.05" size="0.01"/>
                                 <geom type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="link6" />
                                 <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="gripper_base" />
                                 <body name="link7" pos="0 0 0.1358" quat="0.707105 0.707108 0 0">
@@ -57,6 +58,10 @@
             </body>
         </body>
     </worldbody>
+    <sensor>
+        <force  name="ft_sensor_force"  site="ft_sensor_site" noise="0.001"/>
+        <torque name="ft_sensor_torque" site="ft_sensor_site" noise="0.0001"/>
+    </sensor>
     <actuator>
         <position name="joint1" ctrllimited="true" ctrlrange="-2.618 2.618" joint="joint1" kp="10000" user="1" forcelimited="true" forcerange="-20000 20000"/>
         <position name="joint2" ctrllimited="true" ctrlrange="0 3.14158" joint="joint2" kp="2000" user="1" forcelimited="true" forcerange="-20000 20000"/>

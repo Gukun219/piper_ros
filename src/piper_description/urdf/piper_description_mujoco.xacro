@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MuJoCo-specific robot description for Piper arm.
+  Includes the base URDF and adds:
+    - FT sensor link/joint at the end-effector (link6)
+    - ros2_control block using mujoco_ros2_control/MuJoCoSystem hardware plugin
+
+  Control pipeline:
+    MoveIt  →  JointTrajectoryController (chainable)
+            →  AdmittanceController      (reads FT sensor, outputs position)
+            →  mujoco_ros2_control/MuJoCoSystem  (MuJoCo physics)
+-->
+<robot name="piper" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Include base robot description (links, joints, transmissions) -->
+  <xacro:include filename="$(find piper_description)/urdf/piper_description.xacro"/>
+
+  <!-- ─────────────────────────────────────────────────────────────────
+       FT Sensor virtual link/joint attached to link6 (end-effector)
+       The MuJoCo model has a <sensor> site at ft_sensor_site (see
+       mujoco_model/piper_description.xml).  The ros2_control sensor
+       block below maps those readings into hardware state interfaces.
+       ───────────────────────────────────────────────────────────────── -->
+  <link name="ft_sensor_link">
+    <inertial>
+      <mass value="0.001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+    </inertial>
+  </link>
+
+  <joint name="ft_sensor_joint" type="fixed">
+    <parent link="link6"/>
+    <child  link="ft_sensor_link"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ─────────────────────────────────────────────────────────────────
+       ros2_control hardware interface for MuJoCo simulation.
+       Requires: ros-humble-mujoco-ros2-control (or equivalent).
+
+       Joint command interfaces  : position only  (unchanged from real hw)
+       Joint state interfaces    : position, velocity
+       Sensor state interfaces   : ft_sensor (6-DOF wrench)
+       ───────────────────────────────────────────────────────────────── -->
+  <ros2_control name="piper_mujoco_system" type="system">
+    <hardware>
+      <plugin>mujoco_ros2_control/MuJoCoSystem</plugin>
+    </hardware>
+
+    <!-- Arm joints: position command, position+velocity state -->
+    <joint name="joint1">
+      <command_interface name="position">
+        <param name="min">-2.618</param>
+        <param name="max"> 2.618</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint2">
+      <command_interface name="position">
+        <param name="min">0.0</param>
+        <param name="max">3.14159</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint3">
+      <command_interface name="position">
+        <param name="min">-2.967</param>
+        <param name="max"> 0.0</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint4">
+      <command_interface name="position">
+        <param name="min">-1.745</param>
+        <param name="max"> 1.745</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint5">
+      <command_interface name="position">
+        <param name="min">-1.22</param>
+        <param name="max"> 1.22</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint6">
+      <command_interface name="position">
+        <param name="min">-2.0944</param>
+        <param name="max"> 2.0944</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- Gripper joints: position command only, no admittance control -->
+    <joint name="joint7">
+      <command_interface name="position">
+        <param name="min">0.0</param>
+        <param name="max">0.035</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint8">
+      <command_interface name="position">
+        <param name="min">-0.035</param>
+        <param name="max"> 0.0</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <!-- FT sensor: maps MuJoCo ft_sensor_force/torque sensordata
+         to ros2_control state interfaces consumed by admittance_controller -->
+    <sensor name="ft_sensor">
+      <state_interface name="force.x"/>
+      <state_interface name="force.y"/>
+      <state_interface name="force.z"/>
+      <state_interface name="torque.x"/>
+      <state_interface name="torque.y"/>
+      <state_interface name="torque.z"/>
+    </sensor>
+
+  </ros2_control>
+
+</robot>

@@ -1,18 +1,36 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>piper_mujoco</name>
-  <version>0.0.0</version>
-  <description>The piper_mujoco package</description>
+  <version>0.0.1</version>
+  <description>MuJoCo simulation for Piper arm with ros2_control and admittance controller</description>
 
   <maintainer email="tian@todo.todo">tian</maintainer>
   <license>TODO</license>
 
-  <!-- 依赖项 -->
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>rclpy</build_depend>
-  <build_depend>std_msgs</build_depend>
+
+  <!-- Runtime: ROS2 core -->
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+
+  <!-- Runtime: robot description -->
+  <exec_depend>piper_description</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <!-- Runtime: ros2_control stack -->
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>admittance_controller</exec_depend>
+  <exec_depend>force_torque_sensor_broadcaster</exec_depend>
+  <exec_depend>kinematics_interface</exec_depend>
+  <exec_depend>kinematics_interface_kdl</exec_depend>
+
+  <!-- Runtime: MuJoCo hardware interface for ros2_control -->
+  <exec_depend>mujoco_ros2_control</exec_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>
