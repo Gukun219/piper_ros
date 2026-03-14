@@ -7,6 +7,9 @@ find_package(ament_cmake REQUIRED)
 install(PROGRAMS
   scripts/piper_mujoco_ctrl.py
   scripts/piper_no_gripper_mujoco_ctrl.py
+  scripts/admittance_trajectory_bridge.py
+  scripts/admittance_demo.py
+  scripts/world_force_bridge.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

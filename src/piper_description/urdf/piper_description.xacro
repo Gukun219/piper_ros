@@ -2,6 +2,7 @@
 <robot
   name="piper"
   xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="lock_joints_4_6" default="false"/>
 <!-- world -->
   <link name="world"/>
   <joint name="fixed_base_joint" type="fixed">
@@ -220,24 +221,22 @@
       </geometry>
     </collision>
   </link>
-  <joint
-    name="joint4"
-    type="revolute">
-    <origin
-      xyz="-0.021984 -0.25075 0"
-      rpy="1.5708 0 0" />
-    <parent
-      link="link3" />
-    <child
-      link="link4" />
-    <axis
-      xyz="0 0 1" />
-    <limit
-      lower="-1.745"
-      upper="1.745"
-      effort="100"
-      velocity="5" />
-  </joint>
+  <xacro:if value="$(arg lock_joints_4_6)">
+    <joint name="joint4" type="fixed">
+      <origin xyz="-0.021984 -0.25075 0" rpy="1.5708 0 0" />
+      <parent link="link3" />
+      <child  link="link4" />
+    </joint>
+  </xacro:if>
+  <xacro:unless value="$(arg lock_joints_4_6)">
+    <joint name="joint4" type="revolute">
+      <origin xyz="-0.021984 -0.25075 0" rpy="1.5708 0 0" />
+      <parent link="link3" />
+      <child  link="link4" />
+      <axis   xyz="0 0 1" />
+      <limit  lower="-1.745" upper="1.745" effort="100" velocity="5" />
+    </joint>
+  </xacro:unless>
   <link
     name="link5">
     <inertial>
@@ -318,24 +317,22 @@
       </geometry>
     </collision>
   </link>
-  <joint
-    name="joint6"
-    type="revolute">
-    <origin
-      xyz="8.8259E-05 -0.091 0"
-      rpy="1.5708 0 0" />
-    <parent
-      link="link5" />
-    <child
-      link="link6" />
-    <axis
-      xyz="0 0 1" />
-    <limit
-      lower="-2.0944"
-      upper="2.0944"
-      effort="100"
-      velocity="3" />
-  </joint>
+  <xacro:if value="$(arg lock_joints_4_6)">
+    <joint name="joint6" type="fixed">
+      <origin xyz="8.8259E-05 -0.091 0" rpy="1.5708 0 0" />
+      <parent link="link5" />
+      <child  link="link6" />
+    </joint>
+  </xacro:if>
+  <xacro:unless value="$(arg lock_joints_4_6)">
+    <joint name="joint6" type="revolute">
+      <origin xyz="8.8259E-05 -0.091 0" rpy="1.5708 0 0" />
+      <parent link="link5" />
+      <child  link="link6" />
+      <axis   xyz="0 0 1" />
+      <limit  lower="-2.0944" upper="2.0944" effort="100" velocity="3" />
+    </joint>
+  </xacro:unless>
   <link
     name="gripper_base">
     <inertial>
@@ -521,9 +518,13 @@
   <xacro:transmission_block tran_name="tran1" joint_name="joint1" motor_name="motor1"/>
   <xacro:transmission_block tran_name="tran2" joint_name="joint2" motor_name="motor2"/>
   <xacro:transmission_block tran_name="tran3" joint_name="joint3" motor_name="motor3"/>
-  <xacro:transmission_block tran_name="tran4" joint_name="joint4" motor_name="motor4"/>
+  <xacro:unless value="$(arg lock_joints_4_6)">
+    <xacro:transmission_block tran_name="tran4" joint_name="joint4" motor_name="motor4"/>
+  </xacro:unless>
   <xacro:transmission_block tran_name="tran5" joint_name="joint5" motor_name="motor5"/>
-  <xacro:transmission_block tran_name="tran6" joint_name="joint6" motor_name="motor6"/>
+  <xacro:unless value="$(arg lock_joints_4_6)">
+    <xacro:transmission_block tran_name="tran6" joint_name="joint6" motor_name="motor6"/>
+  </xacro:unless>
   <xacro:transmission_block tran_name="tran7" joint_name="joint7" motor_name="motor7"/>
   <xacro:transmission_block tran_name="tran8" joint_name="joint8" motor_name="motor8"/>
 <!-- gazebo -->

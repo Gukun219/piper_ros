@@ -24,6 +24,7 @@
 <robot name="piper" xmlns:xacro="http://ros.org/wiki/xacro">
 
   <xacro:arg name="use_mock_hardware" default="true"/>
+  <xacro:arg name="lock_joints_4_6" default="false"/>
 
   <!-- Include base robot description (links, joints, transmissions) -->
   <xacro:include filename="$(find piper_description)/urdf/piper_description.xacro"/>
@@ -60,6 +61,7 @@
       <xacro:if value="$(arg use_mock_hardware)">
         <!-- mock: no external package needed, joints mirror commands -->
         <plugin>mock_components/GenericSystem</plugin>
+        <param name="mock_sensor_commands">true</param>
       </xacro:if>
       <xacro:unless value="$(arg use_mock_hardware)">
         <!-- full MuJoCo physics: requires mujoco_ros2_control -->
@@ -101,6 +103,7 @@
       <state_interface name="velocity"/>
     </joint>
 
+    <xacro:unless value="$(arg lock_joints_4_6)">
     <joint name="joint4">
       <command_interface name="position">
         <param name="min">-1.745</param>
@@ -111,6 +114,7 @@
       </state_interface>
       <state_interface name="velocity"/>
     </joint>
+    </xacro:unless>
 
     <joint name="joint5">
       <command_interface name="position">
@@ -123,6 +127,7 @@
       <state_interface name="velocity"/>
     </joint>
 
+    <xacro:unless value="$(arg lock_joints_4_6)">
     <joint name="joint6">
       <command_interface name="position">
         <param name="min">-2.0944</param>
@@ -133,6 +138,7 @@
       </state_interface>
       <state_interface name="velocity"/>
     </joint>
+    </xacro:unless>
 
     <!-- Gripper joints: position command only, no admittance control -->
     <joint name="joint7">
@@ -160,12 +166,24 @@
     <!-- FT sensor: maps MuJoCo ft_sensor_force/torque sensordata
          to ros2_control state interfaces consumed by admittance_controller -->
     <sensor name="ft_sensor">
-      <state_interface name="force.x"/>
-      <state_interface name="force.y"/>
-      <state_interface name="force.z"/>
-      <state_interface name="torque.x"/>
-      <state_interface name="torque.y"/>
-      <state_interface name="torque.z"/>
+      <state_interface name="force.x">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="force.y">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="force.z">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="torque.x">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="torque.y">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="torque.z">
+        <param name="initial_value">0.0</param>
+      </state_interface>
     </sensor>
 
   </ros2_control>
