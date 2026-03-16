@@ -42,6 +42,28 @@ ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
 ros2 launch piper_mujoco piper_mujoco_ros2.launch.py use_mock_hardware:=false
 ```
 
+python3 -c "
+import rclpy, math, time
+from rclpy.node import Node
+from geometry_msgs.msg import Wrench
+
+rclpy.init()
+node = Node('force_pub')
+pub = node.create_publisher(Wrench, '/world_force_cmd', 10)
+
+amplitude = 20.0   # N
+freq = 0.1         # Hz
+t0 = time.time()
+print(f'Injecting {amplitude}N sinusoidal force along world Z at {freq}Hz')
+while rclpy.ok():
+    F = amplitude + amplitude * math.sin(2 * math.pi * freq * (time.time() - t0))  # start at max force
+    msg = Wrench()
+    msg.force.z = F   # world Z = 竖直方向
+    pub.publish(msg)
+    time.sleep(0.01)
+"
+
+
 ## 4 控制器架构
 
 ```
