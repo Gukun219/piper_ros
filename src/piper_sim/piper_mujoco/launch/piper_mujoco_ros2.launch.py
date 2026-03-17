@@ -28,6 +28,14 @@ Prerequisites:
                    ros-humble-force-torque-sensor-broadcaster \\
                    ros-humble-kinematics-interface \\
                    ros-humble-kinematics-interface-kdl
+
+Debugging:
+  Set DEBUG_NODE env var to the executable name of the node to debug.
+  The node will pause and wait for a debugpy attach on port 5678 (VS Code F5).
+
+  Examples:
+    DEBUG_NODE=piper_mujoco_ctrl.py         ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
+    DEBUG_NODE=admittance_trajectory_bridge.py ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
 """
 
 import os
@@ -47,6 +55,13 @@ from launch_ros.actions import Node
 def remove_comments(text):
     """Strip XML comments (some parsers choke on them in robot_description)."""
     return re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+
+
+def debug_prefix(executable_name):
+    """Return debugpy prefix if DEBUG_NODE matches this executable, else empty string."""
+    if os.environ.get('DEBUG_NODE') == executable_name:
+        return 'python3 -m debugpy --listen 5678 --wait-for-client'
+    return ''
 
 
 def generate_launch_description():
@@ -107,8 +122,8 @@ def generate_launch_description():
     mujoco_viewer = Node(
         package='piper_mujoco',
         executable='piper_mujoco_ctrl.py',
-        # executable='piper_mujoco_ctrl_debug.py',
         output='screen',
+        prefix=debug_prefix('piper_mujoco_ctrl.py'),
         parameters=[{'viewer_only': NotSubstitution(use_mock_hardware)}],
     )
 
@@ -117,6 +132,7 @@ def generate_launch_description():
         package='piper_mujoco',
         executable='admittance_trajectory_bridge.py',
         output='screen',
+        prefix=debug_prefix('admittance_trajectory_bridge.py'),
     )
 
     # ── World-frame force bridge (world Wrench → sensor-frame injectors) ──
@@ -124,6 +140,7 @@ def generate_launch_description():
         package='piper_mujoco',
         executable='world_force_bridge.py',
         output='screen',
+        prefix=debug_prefix('world_force_bridge.py'),
         condition=IfCondition(use_mock_hardware),
     )
 

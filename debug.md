@@ -61,28 +61,44 @@ ros2 launch piper_mujoco piper_mujoco_ros2.launch.py --debug 2>&1 | grep -E "spa
 
 ## 二、调试普通节点脚本
 
-### 方法：独立 debug 包装脚本 + VS Code attach
+### 方法：`DEBUG_NODE` 环境变量 + VS Code attach
 
-#### 文件结构
+launch 文件已内置调试支持，通过 `DEBUG_NODE` 环境变量指定要调试的节点，**无需创建任何 wrapper 脚本，无需修改 launch 文件**。
 
-```
-scripts/
-├── piper_mujoco_ctrl.py          ← 主脚本，不做任何修改
-└── piper_mujoco_ctrl_debug.py    ← 调试用包装脚本
-```
+#### 原理
 
-#### piper_mujoco_ctrl_debug.py
+launch 文件中每个 Python 节点都加了 `prefix`：
 
 ```python
-#!/usr/bin/env python3
-import debugpy
-debugpy.listen(5678)
-print("Waiting for debugger to attach on port 5678...")
-debugpy.wait_for_client()
+def debug_prefix(executable_name):
+    if os.environ.get('DEBUG_NODE') == executable_name:
+        return 'python3 -m debugpy --listen 5678 --wait-for-client'
+    return ''
 
-from piper_mujoco_ctrl import main
-main()
+mujoco_viewer = Node(
+    executable='piper_mujoco_ctrl.py',
+    prefix=debug_prefix('piper_mujoco_ctrl.py'),  # ← 匹配时自动注入 debugpy
+    ...
+)
 ```
+
+#### 使用步骤
+
+1. 安装 debugpy：`pip install debugpy`
+
+2. 设置 `DEBUG_NODE` 启动：
+```bash
+# 调试 piper_mujoco_ctrl.py
+DEBUG_NODE=piper_mujoco_ctrl.py ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
+
+# 调试 admittance_trajectory_bridge.py
+DEBUG_NODE=admittance_trajectory_bridge.py ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
+
+# 正常运行（不调试）
+ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
+```
+
+3. 终端出现等待提示后，在 VS Code 中设置断点，按 `F5` 附加调试器。
 
 #### VS Code launch.json
 
@@ -91,7 +107,7 @@ main()
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Attach to piper_mujoco_ctrl",
+            "name": "Attach to ROS2 Node",
             "type": "debugpy",
             "request": "attach",
             "connect": { "host": "localhost", "port": 5678 },
@@ -104,28 +120,13 @@ main()
 }
 ```
 
-#### 使用步骤
+#### 支持调试的节点
 
-1. 安装 debugpy：`pip install debugpy`
-2. 构建：`colcon build --symlink-install --packages-select piper_mujoco`
-3. 启动调试版节点：
-```bash
-ros2 run piper_mujoco piper_mujoco_ctrl_debug.py
-# 终端输出：Waiting for debugger to attach on port 5678...
-```
-4. 在 `piper_mujoco_ctrl.py` 中设置断点，VS Code 按 `F5` 附加。
-
-#### 通过 launch 文件启动时调试
-
-修改 launch 文件中对应节点的 executable：
-
-```python
-mujoco_viewer = Node(
-    package='piper_mujoco',
-    executable='piper_mujoco_ctrl_debug.py',  # ← 改为 debug 版本
-    ...
-)
-```
+| `DEBUG_NODE` 值 | 对应节点 |
+|---|---|
+| `piper_mujoco_ctrl.py` | MuJoCo 仿真节点 |
+| `admittance_trajectory_bridge.py` | 轨迹桥接节点 |
+| `world_force_bridge.py` | 世界坐标力桥接节点 |
 
 ### 注意
 - 实时控制循环（100Hz）命中断点会暂停物理仿真
@@ -138,9 +139,10 @@ self.get_logger().info(f"joint_targets: {self.joint_targets}")
 
 ## 三、方法对比
 
-| | Launch 文件 `breakpoint()` | 节点 `debugpy` attach |
+| | Launch 文件 `breakpoint()` | 节点 `DEBUG_NODE` + debugpy |
 |---|---|---|
-| **侵入性** | 需在源码插入断点 | 主脚本零修改 |
+| **侵入性** | 需在源码插入断点 | 源码零修改 |
 | **IDE 支持** | 仅命令行 pdb | VS Code 图形化断点、变量面板 |
 | **适用时机** | 进程启动阶段（一次性） | 进程运行阶段（长期） |
-| **调试完清理** | 移除 `breakpoint()` | 直接用主脚本运行，无需清理 |
+| **切换方式** | 移除 `breakpoint()` | 不设 `DEBUG_NODE` 即为正常运行 |
+| **多节点支持** | 每处手动插入 | 一个 launch 文件统一支持所有节点 |
