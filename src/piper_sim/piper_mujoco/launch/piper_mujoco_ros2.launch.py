@@ -40,7 +40,7 @@ from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, RegisterEventHandler)
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, NotSubstitution
 from launch_ros.actions import Node
 
 
@@ -53,10 +53,12 @@ def generate_launch_description():
     pkg_description = get_package_share_directory('piper_description')
     pkg_mujoco      = get_package_share_directory('piper_mujoco')
 
+    # breakpoint()
+
     # ── Launch argument ───────────────────────────────────────────────────────
     use_mock_hardware_arg = DeclareLaunchArgument(
         'use_mock_hardware',
-        default_value='true',
+        default_value='false',
         description=(
             'Use mock_components/GenericSystem (true) or '
             'mujoco_ros2_control/MuJoCoSystem (false).'
@@ -99,12 +101,15 @@ def generate_launch_description():
         ],
     )
 
-    # ── MuJoCo visualization node (mock mode) ────────────────────────────────
+    # ── MuJoCo visualization node (both modes) ───────────────────────────────
+    # viewer_only=true  when use_mock_hardware=false (mujoco_ros2_control runs physics)
+    # viewer_only=false when use_mock_hardware=true  (viewer drives physics itself)
     mujoco_viewer = Node(
         package='piper_mujoco',
         executable='piper_mujoco_ctrl.py',
+        # executable='piper_mujoco_ctrl_debug.py',
         output='screen',
-        condition=IfCondition(use_mock_hardware),
+        parameters=[{'viewer_only': NotSubstitution(use_mock_hardware)}],
     )
 
     # ── Trajectory bridge (FollowJointTrajectory action → admittance topic) ──

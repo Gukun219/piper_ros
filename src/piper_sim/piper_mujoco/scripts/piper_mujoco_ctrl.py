@@ -4,6 +4,7 @@
 import sys
 print(sys.executable)
 
+
 import os
 import mujoco
 import mujoco.viewer
@@ -42,6 +43,9 @@ class MujocoModel(Node):
             name = self.model.actuator(i).name
             self.actuator_idx[name] = i
 
+        self.declare_parameter('viewer_only', False)
+        self.viewer_only = self.get_parameter('viewer_only').value
+
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
         self.timer = self.create_timer(0.01, self.control_loop)  # 100Hz 控制循环
@@ -69,10 +73,18 @@ class MujocoModel(Node):
 
     def control_loop(self):
         """ 让 MuJoCo 机械臂跟随 ROS 关节状态 """
-        for joint, target_angle in self.joint_targets.items():
-            if joint in self.joint_qpos_idx:
-                self.pos_ctrl(joint, target_angle)
-        mujoco.mj_step(self.model, self.data)
+        if self.viewer_only:
+            # viewer_only 模式：直接写 qpos，不跑物理（mujoco_ros2_control 已在插件内跑）
+            for joint, angle in self.joint_targets.items():
+                if joint in self.joint_qpos_idx:
+                    self.data.qpos[self.joint_qpos_idx[joint]] = angle
+            mujoco.mj_forward(self.model, self.data)
+        else:
+            # mock 模式：通过 actuator 驱动 + 物理步进
+            for joint, target_angle in self.joint_targets.items():
+                if joint in self.joint_qpos_idx:
+                    self.pos_ctrl(joint, target_angle)
+            mujoco.mj_step(self.model, self.data)
         if self.viewer.is_running():
             self.viewer.sync()
 
