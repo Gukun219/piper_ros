@@ -47,7 +47,7 @@ def generate_test_description():
     show_viewer = os.environ.get('PIPER_VISUAL_TEST', '').lower() in ('1', 'true')
 
     pkg_description = get_package_share_directory('piper_description')
-    pkg_mujoco = get_package_share_directory('piper_mujoco')
+    pkg_compliance = get_package_share_directory('compliance_control')
 
     xacro_file = os.path.join(pkg_description, 'urdf', 'piper_description_mujoco.xacro')
     doc = xacro.parse(open(xacro_file))
@@ -55,7 +55,7 @@ def generate_test_description():
                                      'lock_joints_4_6': 'true'})
     robot_description = _remove_comments(doc.toxml())
 
-    controllers_yaml = os.path.join(pkg_mujoco, 'config', 'ros2_controllers.yaml')
+    controllers_yaml = os.path.join(pkg_compliance, 'config', 'ros2_controllers.yaml')
 
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -79,7 +79,7 @@ def generate_test_description():
     )
 
     trajectory_bridge = Node(
-        package='piper_mujoco',
+        package='compliance_control',
         executable='admittance_trajectory_bridge.py',
         output='screen',
     )

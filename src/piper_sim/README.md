@@ -40,6 +40,17 @@ ros2 launch piper_gazebo piper_no_gripper_gazebo.launch.py
 
 ## 2 mujoco仿真
 
+### 2.0 包结构说明
+
+MuJoCo 仿真分为两个包：
+
+| 包 | 职责 |
+|---|---|
+| `piper_mujoco` | MuJoCo viewer 节点（机器人可视化/物理仿真窗口） |
+| `compliance_control` | ros2_control 导纳控制栈（控制器、launch 文件、集成测试） |
+
+导纳控制完整文档见 [compliance_control README](../../compliance_control/README.md)。
+
 ### 2.1 mujoco210和mujoco-py的安装
 
 #### 2.1.1 安装mujoco
@@ -171,8 +182,43 @@ ros2 launch piper_description display_no_gripper_urdf.launch.py
 
 [无夹爪控制参数](../piper_description/mujoco_model/piper_no_gripper_description.xml)
 
-- damping="100 更改关节阻尼
+- damping="100" 更改关节阻尼
 
 - kp="10000" 更改关节控制增益
 
 - forcerange="-100 100" 更改关节控制力矩
+
+### 2.4 ros2_control 导纳控制仿真
+
+基于 ros2_control + AdmittanceController 的柔顺控制仿真，支持 mock 硬件（CI 友好）和完整 MuJoCo 物理仿真两种模式。
+
+#### 构建
+
+```bash
+cd piper_ros
+colcon build --packages-select piper_description compliance_control piper_mujoco
+source install/setup.bash
+```
+
+#### 启动
+
+```bash
+# mock 硬件模式（无 MuJoCo 窗口，适合 CI / 开发调试）
+ros2 launch compliance_control compliance_control.launch.py use_mock_hardware:=true
+
+# 完整 MuJoCo 物理仿真（有渲染窗口）
+ros2 launch compliance_control compliance_control.launch.py use_mock_hardware:=false
+```
+
+#### 验证导纳响应（mock 模式）
+
+```bash
+# 在 Z 方向注入 10 N，观察关节偏移
+ros2 topic pub /ft_fz_injector/commands std_msgs/Float64MultiArray "{data: [10.0]}"
+
+# 撤力，观察关节回归
+ros2 topic pub /ft_fz_injector/commands std_msgs/Float64MultiArray "{data: [0.0]}"
+```
+
+详细设计说明、参数调优、集成测试文档见
+[compliance_control README](../../compliance_control/README.md)。

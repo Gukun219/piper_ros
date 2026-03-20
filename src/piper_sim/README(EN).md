@@ -40,6 +40,17 @@ ros2 launch piper_gazebo piper_no_gripper_gazebo.launch.py
 
 ## 2 Mujoco Simulation
 
+### 2.0 Package Overview
+
+The MuJoCo simulation is split into two packages:
+
+| Package | Responsibility |
+|---|---|
+| `piper_mujoco` | MuJoCo viewer nodes (visualization / physics window) |
+| `compliance_control` | ros2_control admittance stack (controllers, launch file, integration tests) |
+
+Full documentation for admittance control: [compliance_control README](../../compliance_control/README.md).
+
 ### 2.1 Installing Mujoco 2.1.0 and mujoco-py
 
 #### 2.1.1 Install Mujoco
@@ -174,3 +185,38 @@ ros2 launch piper_description display_no_gripper_urdf.launch.py
 - `damping="100"` → Adjust joint damping
 - `kp="10000"` → Adjust joint control gain
 - `forcerange="-100 100"` → Adjust joint control torque range
+
+### 2.4 ros2_control Admittance Compliance Simulation
+
+Compliance simulation based on ros2_control + AdmittanceController. Supports mock hardware (CI-friendly, no window) and full MuJoCo physics.
+
+#### Build
+
+```bash
+cd piper_ros
+colcon build --packages-select piper_description compliance_control piper_mujoco
+source install/setup.bash
+```
+
+#### Launch
+
+```bash
+# Mock hardware mode (no MuJoCo window, suitable for CI / development)
+ros2 launch compliance_control compliance_control.launch.py use_mock_hardware:=true
+
+# Full MuJoCo physics simulation (with render window)
+ros2 launch compliance_control compliance_control.launch.py use_mock_hardware:=false
+```
+
+#### Verify Admittance Response (mock mode)
+
+```bash
+# Inject 10 N in the Z direction and observe joint displacement
+ros2 topic pub /ft_fz_injector/commands std_msgs/Float64MultiArray "{data: [10.0]}"
+
+# Remove force and observe joints returning toward home
+ros2 topic pub /ft_fz_injector/commands std_msgs/Float64MultiArray "{data: [0.0]}"
+```
+
+For detailed design, parameter tuning, and integration test documentation see
+[compliance_control README](../../compliance_control/README.md).

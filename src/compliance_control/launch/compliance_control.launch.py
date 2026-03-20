@@ -1,7 +1,7 @@
 """
-piper_mujoco_ros2.launch.py
+compliance_control.launch.py
 ────────────────────────────
-Launch file for Piper arm simulation with ros2_control admittance control.
+Generic ros2_control admittance compliance launch file.
 
 Architecture (Humble topic-bridge):
   User/MoveIt ──(FollowJointTrajectory action)──► trajectory_bridge
@@ -15,27 +15,29 @@ Architecture (Humble topic-bridge):
                                             hardware interface (mock or MuJoCo)
 
 Launch arguments:
-  use_mock_hardware  [true]  — Use mock_components/GenericSystem (default).
-                    [false]  — Use mujoco_ros2_control/MuJoCoSystem.
+  use_mock_hardware    [false]  — Use mock_components/GenericSystem (true) or
+                                  mujoco_ros2_control/MuJoCoSystem (false).
+  xacro_file           — Path to robot xacro file.
+                         Default: piper_description/urdf/piper_description_mujoco.xacro
+  controllers_config   — Path to ros2_controllers yaml.
+                         Default: compliance_control/config/ros2_controllers.yaml
+  viewer_package       — Package containing the MuJoCo viewer executable.
+                         Default: piper_mujoco
+  viewer_executable    — MuJoCo viewer executable name.
+                         Default: piper_mujoco_ctrl.py
 
 Controller load order:
   1. joint_state_broadcaster
   2. force_torque_sensor_broadcaster
-  3. admittance_controller + gripper_controller
-
-Prerequisites:
-  sudo apt install ros-humble-admittance-controller \\
-                   ros-humble-force-torque-sensor-broadcaster \\
-                   ros-humble-kinematics-interface \\
-                   ros-humble-kinematics-interface-kdl
+  3. admittance_controller + gripper_controller (+ FT injectors when mock)
 
 Debugging:
   Set DEBUG_NODE env var to the executable name of the node to debug.
   The node will pause and wait for a debugpy attach on port 5678 (VS Code F5).
 
   Examples:
-    DEBUG_NODE=piper_mujoco_ctrl.py         ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
-    DEBUG_NODE=admittance_trajectory_bridge.py ros2 launch piper_mujoco piper_mujoco_ros2.launch.py
+    DEBUG_NODE=piper_mujoco_ctrl.py             ros2 launch compliance_control compliance_control.launch.py
+    DEBUG_NODE=admittance_trajectory_bridge.py  ros2 launch compliance_control compliance_control.launch.py
 """
 
 import os
@@ -66,11 +68,15 @@ def debug_prefix(executable_name):
 
 def generate_launch_description():
     pkg_description = get_package_share_directory('piper_description')
-    pkg_mujoco      = get_package_share_directory('piper_mujoco')
+    pkg_compliance  = get_package_share_directory('compliance_control')
 
-    # breakpoint()
+    # ── Default paths ─────────────────────────────────────────────────────────
+    default_xacro_file = os.path.join(
+        pkg_description, 'urdf', 'piper_description_mujoco.xacro')
+    default_controllers_config = os.path.join(
+        pkg_compliance, 'config', 'ros2_controllers.yaml')
 
-    # ── Launch argument ───────────────────────────────────────────────────────
+    # ── Launch arguments ──────────────────────────────────────────────────────
     use_mock_hardware_arg = DeclareLaunchArgument(
         'use_mock_hardware',
         default_value='false',
@@ -79,17 +85,41 @@ def generate_launch_description():
             'mujoco_ros2_control/MuJoCoSystem (false).'
         ),
     )
-    use_mock_hardware = LaunchConfiguration('use_mock_hardware')
+    xacro_file_arg = DeclareLaunchArgument(
+        'xacro_file',
+        default_value=default_xacro_file,
+        description='Path to the robot xacro file.',
+    )
+    controllers_config_arg = DeclareLaunchArgument(
+        'controllers_config',
+        default_value=default_controllers_config,
+        description='Path to the ros2_controllers yaml configuration file.',
+    )
+    viewer_package_arg = DeclareLaunchArgument(
+        'viewer_package',
+        default_value='piper_mujoco',
+        description='Package that contains the MuJoCo viewer executable.',
+    )
+    viewer_executable_arg = DeclareLaunchArgument(
+        'viewer_executable',
+        default_value='piper_mujoco_ctrl.py',
+        description='Name of the MuJoCo viewer executable.',
+    )
 
-    # ── Robot description ─────────────────────────────────────────────────────
-    xacro_file = os.path.join(pkg_description, 'urdf',
-                              'piper_description_mujoco.xacro')
-    doc = xacro.parse(open(xacro_file))
+    use_mock_hardware   = LaunchConfiguration('use_mock_hardware')
+    xacro_file          = LaunchConfiguration('xacro_file')
+    controllers_config  = LaunchConfiguration('controllers_config')
+    viewer_package      = LaunchConfiguration('viewer_package')
+    viewer_executable   = LaunchConfiguration('viewer_executable')
+
+    # ── Robot description (resolved at launch time using default xacro path) ─
+    # NOTE: xacro processing happens eagerly here using the default path.
+    # For non-default xacro files pass xacro_file:=<path> and ensure the
+    # mappings below match your robot's xacro parameters.
+    doc = xacro.parse(open(default_xacro_file))
     xacro.process_doc(doc, mappings={'use_mock_hardware': 'true',
                                       'lock_joints_4_6': 'true'})
     robot_description_default = remove_comments(doc.toxml())
-
-    controllers_yaml = os.path.join(pkg_mujoco, 'config', 'ros2_controllers.yaml')
 
     # ── robot_state_publisher ─────────────────────────────────────────────────
     robot_state_publisher = Node(
@@ -109,19 +139,19 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {'robot_description': robot_description_default},
-            controllers_yaml,
+            default_controllers_config,
         ],
         remappings=[
             ('~/robot_description', '/robot_description'),
         ],
     )
 
-    # ── MuJoCo visualization node (both modes) ───────────────────────────────
+    # ── MuJoCo visualization node (both modes) ────────────────────────────────
     # viewer_only=true  when use_mock_hardware=false (mujoco_ros2_control runs physics)
     # viewer_only=false when use_mock_hardware=true  (viewer drives physics itself)
     mujoco_viewer = Node(
-        package='piper_mujoco',
-        executable='piper_mujoco_ctrl.py',
+        package=viewer_package,
+        executable=viewer_executable,
         output='screen',
         prefix=debug_prefix('piper_mujoco_ctrl.py'),
         parameters=[{'viewer_only': NotSubstitution(use_mock_hardware)}],
@@ -129,15 +159,15 @@ def generate_launch_description():
 
     # ── Trajectory bridge (FollowJointTrajectory action → admittance topic) ──
     trajectory_bridge = Node(
-        package='piper_mujoco',
+        package='compliance_control',
         executable='admittance_trajectory_bridge.py',
         output='screen',
         prefix=debug_prefix('admittance_trajectory_bridge.py'),
     )
 
-    # ── World-frame force bridge (world Wrench → sensor-frame injectors) ──
+    # ── World-frame force bridge (world Wrench → sensor-frame injectors) ──────
     world_force_bridge = Node(
-        package='piper_mujoco',
+        package='compliance_control',
         executable='world_force_bridge.py',
         output='screen',
         prefix=debug_prefix('world_force_bridge.py'),
@@ -235,6 +265,10 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_mock_hardware_arg,
+        xacro_file_arg,
+        controllers_config_arg,
+        viewer_package_arg,
+        viewer_executable_arg,
         robot_state_publisher,
         ros2_control_node,
         mujoco_viewer,

@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>compliance_control</name>
+  <version>0.0.1</version>
+  <description>Generic ros2_control admittance compliance stack (robot-agnostic)</description>
+
+  <maintainer email="tian@todo.todo">tian</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- Runtime: ROS2 core -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+
+  <!-- Runtime: robot description -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <!-- Runtime: ros2_control stack -->
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>forward_command_controller</exec_depend>
+  <exec_depend>admittance_controller</exec_depend>
+  <exec_depend>force_torque_sensor_broadcaster</exec_depend>
+  <exec_depend>kinematics_interface</exec_depend>
+  <exec_depend>kinematics_interface_kdl</exec_depend>
+
+  <!-- Test dependencies -->
+  <test_depend>launch_testing</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>launch_testing_ros</test_depend>
+  <test_depend>python3-pytest</test_depend>
+  <test_depend>piper_description</test_depend>
+  <test_depend>mujoco_ros2_control</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
