@@ -241,14 +241,19 @@ class AdmittanceTrajectoryBridge(Node):
             t0 = _to_sec(points[i].time_from_start)
             t1 = _to_sec(points[i + 1].time_from_start)
             if t0 <= elapsed < t1:
-                alpha = (elapsed - t0) / (t1 - t0) if (t1 - t0) > 0 else 1.0
+                dt = (t1 - t0) if (t1 - t0) > 0 else 1.0
+                alpha = (elapsed - t0) / dt
                 msg = JointTrajectoryPoint()
-                msg.positions = [
-                    p0 + alpha * (p1 - p0)
-                    for p0, p1 in zip(
-                        points[i].positions, points[i + 1].positions
-                    )
-                ]
+                p0s = points[i].positions
+                p1s = points[i + 1].positions
+                msg.positions = [p0 + alpha * (p1 - p0) for p0, p1 in zip(p0s, p1s)]
+                # Interpolate velocities if available; otherwise derive from position slope
+                if points[i].velocities and points[i + 1].velocities:
+                    v0s = points[i].velocities
+                    v1s = points[i + 1].velocities
+                    msg.velocities = [v0 + alpha * (v1 - v0) for v0, v1 in zip(v0s, v1s)]
+                else:
+                    msg.velocities = [(p1 - p0) / dt for p0, p1 in zip(p0s, p1s)]
                 return msg
 
         return points[0]
@@ -265,11 +270,12 @@ class AdmittanceTrajectoryBridge(Node):
             elapsed = (self.get_clock().now() - traj_data['start_time']).nanoseconds * 1e-9
             ref = self._interpolate(traj_data, elapsed)
             msg.positions = ref.positions
+            msg.velocities = ref.velocities if ref.velocities else [0.0] * len(JOINT_NAMES)
         else:
             # Hold FIXED reference position (not current joint_states!)
             msg.positions = hold_pos
+            msg.velocities = [0.0] * len(JOINT_NAMES)
 
-        msg.velocities = [0.0] * len(JOINT_NAMES)
         self._ref_pub.publish(msg)
 
 
@@ -282,8 +288,10 @@ def main():
         executor.spin()
     except KeyboardInterrupt:
         pass
-    node.destroy_node()
-    rclpy.shutdown()
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

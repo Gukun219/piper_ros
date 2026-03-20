@@ -98,15 +98,17 @@ admittance_controller:
       - joint2
       - joint3
       - joint5
-    # Writes position commands directly to hardware (unchanged interface)
+    # Writes position+velocity commands to hardware (MIT mode requires both)
     command_interfaces:
       - position
+      - velocity
     state_interfaces:
       - position
       - velocity
     # Exposes these as chainable reference interfaces that arm_controller writes to
     chainable_command_interfaces:
       - position
+      - velocity
 
     # FT sensor configuration — reads from ros2_control sensor state interfaces
     ft_sensor:

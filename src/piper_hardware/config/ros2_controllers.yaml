@@ -1,0 +1,125 @@
+# ros2_controllers configuration for Piper arm — real hardware MIT mode
+#
+# Controller chain:
+#   User/MoveIt → trajectory_bridge (FollowJointTrajectory action)
+#               → /admittance_controller/joint_references (topic)
+#               → admittance_controller (AdmittanceController)
+#               → hardware position+velocity command interfaces (mock)
+#
+# Simultaneously, piper_mit_hardware.py:
+#   subscribes to /admittance_controller/joint_references
+#   → JointMitCtrl(pos, vel, kp, kd, t_ref=0) via piper_sdk
+#
+# Note: mock_components/GenericSystem is used here so the ros2_control stack
+# (including admittance_controller) can run without a real C++ hardware plugin.
+# piper_mit_hardware.py handles the actual hardware interface independently.
+
+controller_manager:
+  ros__parameters:
+    update_rate: 500  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    admittance_controller:
+      type: admittance_controller/AdmittanceController
+
+    force_torque_sensor_broadcaster:
+      type: force_torque_sensor_broadcaster/ForceTorqueSensorBroadcaster
+
+    gripper_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# ─── JointStateBroadcaster ────────────────────────────────────────────────────
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint5
+      - joint7
+      - joint8
+
+# ─── AdmittanceController ─────────────────────────────────────────────────────
+admittance_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint5
+    command_interfaces:
+      - position
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    chainable_command_interfaces:
+      - position
+      - velocity
+
+    ft_sensor:
+      name: ft_sensor
+      frame:
+        id: ft_sensor_link
+        external: false
+
+    control:
+      frame:
+        id: ft_sensor_link
+        external: false
+
+    fixed_world_frame:
+      frame:
+        id: world
+        external: false
+
+    gravity_compensation:
+      frame:
+        id: world
+        external: false
+      CoG:
+        pos: [0.0, 0.0, 0.0]
+        force: 0.0
+
+    admittance:
+      selected_axes:  [true, true, true, false, false, false]
+      mass:           [5.0, 5.0, 5.0, 2.0, 2.0, 2.0]
+      damping_ratio:  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+      stiffness:      [200.0, 200.0, 200.0, 50.0, 50.0, 50.0]
+
+    kinematics:
+      plugin_name: kinematics_interface_kdl/KinematicsInterfaceKDL
+      plugin_package: kinematics_interface
+      base: base_link
+      tip: ft_sensor_link
+      group_name: arm
+
+    enable_parameter_update_without_reactivation: true
+
+# ─── ForceTorqueSensorBroadcaster ────────────────────────────────────────────
+force_torque_sensor_broadcaster:
+  ros__parameters:
+    sensor_name: ft_sensor
+    state_interface_names:
+      - force.x
+      - force.y
+      - force.z
+      - torque.x
+      - torque.y
+      - torque.z
+    frame_id: ft_sensor_link
+    topic_name: ft_sensor_broadcaster/wrench
+
+# ─── Gripper controller ───────────────────────────────────────────────────────
+gripper_controller:
+  ros__parameters:
+    joints:
+      - joint7
+      - joint8
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity

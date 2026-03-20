@@ -52,7 +52,7 @@
   <!-- ─────────────────────────────────────────────────────────────────
        ros2_control hardware interface.
 
-       Joint command interfaces  : position only  (unchanged from real hw)
+       Joint command interfaces  : position + velocity  (AdmittanceController outputs both)
        Joint state interfaces    : position, velocity
        Sensor state interfaces   : ft_sensor (6-DOF wrench)
        ───────────────────────────────────────────────────────────────── -->
@@ -69,11 +69,15 @@
       </xacro:unless>
     </hardware>
 
-    <!-- Arm joints: position command, position+velocity state -->
+    <!-- Arm joints: position+velocity command, position+velocity state -->
     <joint name="joint1">
       <command_interface name="position">
         <param name="min">-2.618</param>
         <param name="max"> 2.618</param>
+      </command_interface>
+      <command_interface name="velocity">
+        <param name="min">-3.0</param>
+        <param name="max"> 3.0</param>
       </command_interface>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
@@ -86,6 +90,10 @@
         <param name="min">0.0</param>
         <param name="max">3.14159</param>
       </command_interface>
+      <command_interface name="velocity">
+        <param name="min">-3.0</param>
+        <param name="max"> 3.0</param>
+      </command_interface>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
       </state_interface>
@@ -96,6 +104,10 @@
       <command_interface name="position">
         <param name="min">-2.967</param>
         <param name="max"> 0.0</param>
+      </command_interface>
+      <command_interface name="velocity">
+        <param name="min">-3.0</param>
+        <param name="max"> 3.0</param>
       </command_interface>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
@@ -109,6 +121,10 @@
         <param name="min">-1.745</param>
         <param name="max"> 1.745</param>
       </command_interface>
+      <command_interface name="velocity">
+        <param name="min">-3.0</param>
+        <param name="max"> 3.0</param>
+      </command_interface>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
       </state_interface>
@@ -121,6 +137,10 @@
         <param name="min">-1.22</param>
         <param name="max"> 1.22</param>
       </command_interface>
+      <command_interface name="velocity">
+        <param name="min">-3.0</param>
+        <param name="max"> 3.0</param>
+      </command_interface>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
       </state_interface>
@@ -132,6 +152,10 @@
       <command_interface name="position">
         <param name="min">-2.0944</param>
         <param name="max"> 2.0944</param>
+      </command_interface>
+      <command_interface name="velocity">
+        <param name="min">-3.0</param>
+        <param name="max"> 3.0</param>
       </command_interface>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
